@@ -1,0 +1,1 @@
+public record ProductDocument(Guid CorrelationId);

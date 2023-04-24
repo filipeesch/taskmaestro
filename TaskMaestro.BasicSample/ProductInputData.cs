@@ -1,0 +1,1 @@
+public record ProductInputData(Guid CorrelationId);

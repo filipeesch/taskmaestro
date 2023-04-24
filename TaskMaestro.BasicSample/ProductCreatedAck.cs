@@ -1,0 +1,1 @@
+public record ProductCreatedAck(Guid CorrelationId);
