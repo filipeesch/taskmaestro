@@ -1,10 +1,10 @@
+namespace TaskMaestro;
+
 public interface ITask
 {
-    string Id { get; }
+    Guid Id { get; }
 
-    IAckCode AckCode { get; }
-}
+    AckCode AckCode { get; }
 
-public interface ITask<TIn, TOut> : ITask
-{
+    IReadOnlyList<AckCode> WaitForAcks { get; }
 }

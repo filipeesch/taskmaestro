@@ -1,25 +1,26 @@
-﻿var maestro = new Maestro();
+﻿using TaskMaestro;
 
-var saveProductGroup = maestro
-    .BuildTaskGroup()
-    .Create();
+var maestro = new Maestro(new InMemoryDataStore());
+
+// var saveProductGroup = maestro
+//     .BuildTaskGroup()
+//     .Create();
 
 var correlationId = Guid.NewGuid();
 var productInput = new ProductInputData(correlationId);
 
 var productTask = maestro
     .BuildTask()
-    .InGroup(saveProductGroup)
+    // .InGroup(saveProductGroup)
     .Input(productInput)
     .Produces<ProductCreatedAck>()
-    .Async<DispatchCreateProductCommandBeginHandler>()
-    .WithEndHandler<ProductCreatedEndHandler>()
+    .Async<CreateProductCommandHandler>()
     .EndsWith(AckCode.FromGuid(correlationId))
     .Create();
 
 var descriptionsTask = maestro
     .BuildTask()
-    .InGroup(saveProductGroup)
+    // .InGroup(saveProductGroup)
     .Input(productInput)
     .WaitFor(productTask.AckCode, AckCode.FromGuid(correlationId))
     .Sync<SetProductDescriptionsHandler>()
@@ -27,12 +28,12 @@ var descriptionsTask = maestro
 
 var propertiesTask = maestro
     .BuildTask()
-    .InGroup(saveProductGroup)
+    // .InGroup(saveProductGroup)
     .Input(productInput)
     .WaitFor(productTask.AckCode)
     .Sync<SetProductPropertiesHandler>()
     .Create();
 
-saveProductGroup.Close();
+// saveProductGroup.Close();
 
-await maestro.FlushAsync();
+await maestro.SaveAsync(new[] { productTask, descriptionsTask, propertiesTask });

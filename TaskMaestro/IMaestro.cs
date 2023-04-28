@@ -1,12 +1,17 @@
+using TaskMaestro;
+using TaskMaestro.Builders;
+
 public interface IMaestro
 {
     ITaskGroupBuilder BuildTaskGroup();
 
     ITaskBuilder BuildTask();
 
-    Task FlushAsync(CancellationToken? cancellationToken = null);
+    ITask GetTaskAsync(Guid id);
 
-    Task RegisterAckAsync<TAckValue>(IAckCode code, TAckValue value);
+    Task SaveAsync(IEnumerable<ITask> tasks, CancellationToken? cancellationToken = null);
+
+    Task RegisterAcksAsync(IEnumerable<Ack> acks, CancellationToken cancellationToken);
 
     // methods to query tasks
 

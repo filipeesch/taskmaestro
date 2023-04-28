@@ -1,6 +1,6 @@
 public class Void
 {
-    public static Void Value = new Void();
+    public static Void Value = new();
 
     private Void()
     {

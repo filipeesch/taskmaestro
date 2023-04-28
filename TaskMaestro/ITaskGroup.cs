@@ -1,3 +1,5 @@
+using TaskMaestro;
+
 public interface ITaskGroup : ITask
 {
     void Close();

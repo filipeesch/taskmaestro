@@ -4,6 +4,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaskMaestro", "TaskMaestro\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaskMaestro.BasicSample", "TaskMaestro.BasicSample\TaskMaestro.BasicSample.csproj", "{53A12A9D-CCFA-4B68-893B-34823FFF517B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaskMaestro.DataStore.SqlServer", "TaskMaestro.DataStore.SqlServer\TaskMaestro.DataStore.SqlServer.csproj", "{311BAE95-E73C-4179-A00F-4CF90B44952F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{53A12A9D-CCFA-4B68-893B-34823FFF517B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{53A12A9D-CCFA-4B68-893B-34823FFF517B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{53A12A9D-CCFA-4B68-893B-34823FFF517B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{311BAE95-E73C-4179-A00F-4CF90B44952F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{311BAE95-E73C-4179-A00F-4CF90B44952F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{311BAE95-E73C-4179-A00F-4CF90B44952F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{311BAE95-E73C-4179-A00F-4CF90B44952F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
