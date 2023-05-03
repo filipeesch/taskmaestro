@@ -9,10 +9,10 @@ public class MaestroTask : ITask
         ITaskGroup? group,
         IReadOnlyList<AckCode> waitForAcks,
         Type? handlerType,
-        IReadOnlyList<AckCode> endAcks)
+        IReadOnlyList<AckCode> completeAcks)
     {
         this.Id = Guid.NewGuid();
-        this.AckCode = TaskMaestro.AckCode.FromGuid(Guid.NewGuid());
+        this.AckCode = AckCode.FromGuid(Guid.NewGuid());
         this.Type = type;
         this.Input = input;
         this.InputType = input.GetType();
@@ -20,12 +20,12 @@ public class MaestroTask : ITask
         this.Group = group;
         this.WaitForAcks = waitForAcks;
         this.HandlerType = handlerType;
-        this.EndAcks = endAcks;
+        this.CompleteAcks = completeAcks;
     }
 
     public Guid Id { get; }
 
-    public TaskMaestro.AckCode AckCode { get; }
+    public AckCode AckCode { get; }
 
     public TaskType Type { get; }
 
@@ -41,5 +41,5 @@ public class MaestroTask : ITask
 
     private Type? HandlerType { get; }
 
-    private IReadOnlyList<AckCode> EndAcks { get; }
+    private IReadOnlyList<AckCode> CompleteAcks { get; }
 }
