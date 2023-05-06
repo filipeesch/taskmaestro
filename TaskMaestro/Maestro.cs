@@ -24,8 +24,8 @@ public class Maestro : IMaestro
     }
 
     public async Task SaveAsync(
-        IEnumerable<ITask> tasks,
-        CancellationToken? cancellationToken = null) =>
+        IReadOnlyCollection<ITask> tasks,
+        CancellationToken cancellationToken = default) =>
         await this.dataStore.SaveTasksAsync(tasks, cancellationToken);
 
     public async Task RegisterAcksAsync(IEnumerable<Ack> acks, CancellationToken cancellationToken)

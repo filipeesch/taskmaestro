@@ -9,9 +9,9 @@ public interface IMaestro
 
     ITask GetTaskAsync(Guid id);
 
-    Task SaveAsync(IEnumerable<ITask> tasks, CancellationToken? cancellationToken = null);
+    Task SaveAsync(IReadOnlyCollection<ITask> tasks, CancellationToken cancellationToken = default);
 
-    Task RegisterAcksAsync(IEnumerable<Ack> acks, CancellationToken cancellationToken);
+    Task RegisterAcksAsync(IEnumerable<Ack> acks, CancellationToken cancellationToken = default);
 
     // methods to query tasks
 

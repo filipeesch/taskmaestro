@@ -10,7 +10,7 @@ public class InMemoryDataStore : IMaestroDataStore
     private static readonly ConcurrentDictionary<AckCode, object> Acks = new();
     private static readonly Channel<ITask> TaskQueue = Channel.CreateUnbounded<ITask>();
 
-    public Task SaveTasksAsync(IEnumerable<ITask> tasks, CancellationToken? cancellationToken)
+    public Task SaveTasksAsync(IReadOnlyCollection<ITask> tasks, CancellationToken cancellationToken)
     {
         foreach (var task in tasks)
         {

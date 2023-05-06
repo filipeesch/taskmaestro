@@ -1,6 +1,7 @@
 ﻿using TaskMaestro;
+using TaskMaestro.DataStore.SqlServer;
 
-var maestro = new Maestro(new InMemoryDataStore());
+var maestro = new Maestro(new SqlServerDataStore("Server=localhost;Database=TaskMaestroSample;User Id=sa;Password=Product!2021;"));
 
 // var saveProductGroup = maestro
 //     .BuildTaskGroup()

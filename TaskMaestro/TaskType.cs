@@ -1,7 +1,7 @@
 namespace TaskMaestro;
 
-public enum TaskType
+public enum TaskType : byte
 {
-    Sync,
-    Async,
+    Sync = 1,
+    Async = 2,
 }

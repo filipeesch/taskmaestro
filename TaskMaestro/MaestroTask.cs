@@ -21,6 +21,7 @@ public class MaestroTask : ITask
         this.WaitForAcks = waitForAcks;
         this.HandlerType = handlerType;
         this.CompleteAcks = completeAcks;
+        this.CreatedAt = DateTime.UtcNow;
     }
 
     public Guid Id { get; }
@@ -33,13 +34,15 @@ public class MaestroTask : ITask
 
     public Type InputType { get; }
 
-    private Type AckValueType { get; }
+    public Type AckValueType { get; }
 
-    private ITaskGroup? Group { get; }
+    public ITaskGroup? Group { get; }
 
     public IReadOnlyList<AckCode> WaitForAcks { get; }
 
-    private Type? HandlerType { get; }
+    public Type? HandlerType { get; }
 
-    private IReadOnlyList<AckCode> CompleteAcks { get; }
+    public IReadOnlyList<AckCode> CompleteAcks { get; }
+
+    public DateTime CreatedAt { get; }
 }
