@@ -18,9 +18,11 @@ internal class EnumerableDataReader<T> : DbDataReader
     {
         Properties = typeof(T)
             .GetProperties()
-            .Select(property => (property, property.GetCustomAttribute<DataMemberAttribute>()?.Order))
-            .OrderBy(x => x.Order)
-            .Select(x => x.property)
+            .OrderBy(
+                property =>
+                    property.GetCustomAttribute<DataMemberAttribute>()?.Order ??
+                    throw new InvalidOperationException(
+                        $"The property '{property.Name}' of type '{typeof(T).FullName}' must has the DataMember attribute with a defined Order"))
             .ToList();
 
         SchemaTable = CreateSchemaTable(Properties);
@@ -63,67 +65,69 @@ internal class EnumerableDataReader<T> : DbDataReader
         {
             var row = dt.NewRow();
 
+            var propertyType = GetPropertyType(property);
+
             row[SchemaTableColumnOrdinal.ColumnName] = property.Name;
             row[SchemaTableColumnOrdinal.ColumnOrdinal] = propertyOrdinal++;
             row[SchemaTableColumnOrdinal.IsKey] = DBNull.Value;
-            row[SchemaTableColumnOrdinal.DataType] = property.PropertyType;
+            row[SchemaTableColumnOrdinal.DataType] = propertyType;
             row[SchemaTableColumnOrdinal.ColumnSize] = DBNull.Value;
             row[SchemaTableColumnOrdinal.NumericPrecision] = DBNull.Value;
             row[SchemaTableColumnOrdinal.NumericScale] = DBNull.Value;
 
-            if (property.PropertyType == typeof(int))
+            if (propertyType == typeof(int))
             {
                 row[SchemaTableColumnOrdinal.ProviderType] = (int)SqlDbType.Int;
                 row[SchemaTableColumnOrdinal.DataTypeName] = "Int";
             }
-            else if (property.PropertyType == typeof(byte))
+            else if (propertyType == typeof(byte))
             {
                 row[SchemaTableColumnOrdinal.ProviderType] = (int)SqlDbType.TinyInt;
                 row[SchemaTableColumnOrdinal.DataTypeName] = "TinyInt";
             }
-            else if (property.PropertyType == typeof(short))
+            else if (propertyType == typeof(short))
             {
                 row[SchemaTableColumnOrdinal.ProviderType] = (int)SqlDbType.SmallInt;
                 row[SchemaTableColumnOrdinal.DataTypeName] = "SmallInt";
             }
-            else if (property.PropertyType == typeof(long))
+            else if (propertyType == typeof(long))
             {
                 row[SchemaTableColumnOrdinal.ProviderType] = (int)SqlDbType.BigInt;
                 row[SchemaTableColumnOrdinal.DataTypeName] = "BigInt";
             }
-            else if (property.PropertyType == typeof(string))
+            else if (propertyType == typeof(string))
             {
                 row[SchemaTableColumnOrdinal.NumericPrecision] = 255;
                 row[SchemaTableColumnOrdinal.NumericScale] = 255;
                 row[SchemaTableColumnOrdinal.ProviderType] = (int)SqlDbType.NVarChar;
                 row[SchemaTableColumnOrdinal.DataTypeName] = "NVarChar";
             }
-            else if (property.PropertyType == typeof(float))
+            else if (propertyType == typeof(float))
             {
                 row[SchemaTableColumnOrdinal.ProviderType] = (int)SqlDbType.Float;
                 row[SchemaTableColumnOrdinal.DataTypeName] = "Float";
             }
-            else if (property.PropertyType == typeof(double))
+            else if (propertyType == typeof(double))
             {
                 row[SchemaTableColumnOrdinal.ProviderType] = (int)SqlDbType.Real;
                 row[SchemaTableColumnOrdinal.DataTypeName] = "Double";
             }
-            else if (property.PropertyType == typeof(decimal))
+            else if (propertyType == typeof(decimal))
             {
                 row[SchemaTableColumnOrdinal.ProviderType] = (int)SqlDbType.Decimal;
                 row[SchemaTableColumnOrdinal.DataTypeName] = "Decimal";
             }
-            else if (property.PropertyType == typeof(DateTime))
+            else if (propertyType == typeof(DateTime))
             {
                 row[SchemaTableColumnOrdinal.ProviderType] = (int)SqlDbType.DateTime2;
                 row[SchemaTableColumnOrdinal.DataTypeName] = "DateTime2";
             }
-            else if (property.PropertyType == typeof(Guid))
+            else if (propertyType == typeof(Guid))
             {
                 row[SchemaTableColumnOrdinal.ProviderType] = (int)SqlDbType.UniqueIdentifier;
                 row[SchemaTableColumnOrdinal.DataTypeName] = "UniqueIdentifier";
             }
-            else if (property.PropertyType == typeof(byte[]))
+            else if (propertyType == typeof(byte[]))
             {
                 row[SchemaTableColumnOrdinal.NumericPrecision] = 255;
                 row[SchemaTableColumnOrdinal.NumericScale] = 255;
@@ -132,13 +136,22 @@ internal class EnumerableDataReader<T> : DbDataReader
             }
             else
             {
-                throw new NotSupportedException($"The data type '{property.PropertyType.FullName}' is not supported");
+                throw new NotSupportedException($"The data type '{propertyType.FullName}' is not supported");
             }
 
             dt.Rows.Add(row);
         }
 
         return dt;
+    }
+
+    private static Type GetPropertyType(PropertyInfo property)
+    {
+        var propertyType = property.PropertyType;
+
+        return propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Nullable<>) ?
+            propertyType.GetGenericArguments()[0] :
+            propertyType;
     }
 
     public override bool GetBoolean(int ordinal) => (bool)this.GetValue(ordinal);

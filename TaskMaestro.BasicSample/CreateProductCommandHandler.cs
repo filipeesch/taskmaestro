@@ -1,6 +1,6 @@
 public class CreateProductCommandHandler : IAsyncTaskHandler<ProductInputData, ProductCreatedAck>
 {
-    public Task HandleBeginAsync(ProductInputData input, IHandlerContext context, CancellationToken cancellationToken)
+    public Task<AsyncBeginResult> HandleBeginAsync(ProductInputData input, IHandlerContext context, CancellationToken cancellationToken)
     {
         throw new NotImplementedException();
     }

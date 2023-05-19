@@ -16,14 +16,14 @@ var productTask = maestro
     .Input(productInput)
     .Produces<ProductCreatedAck>()
     .Async<CreateProductCommandHandler>()
-    .EndsWith(AckCode.FromGuid(correlationId))
+    // .EndsWith(AckCode.FromGuid(correlationId))
     .Create();
 
 var descriptionsTask = maestro
     .BuildTask()
     // .InGroup(saveProductGroup)
     .Input(productInput)
-    .WaitFor(productTask.AckCode, AckCode.FromGuid(correlationId))
+    .WaitFor(productTask.AckCode)
     .Sync<SetProductDescriptionsHandler>()
     .Create();
 

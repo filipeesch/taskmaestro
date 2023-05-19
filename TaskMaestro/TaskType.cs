@@ -3,5 +3,6 @@ namespace TaskMaestro;
 public enum TaskType : byte
 {
     Sync = 1,
-    Async = 2,
+    AsyncBegin = 2,
+    AsyncEnd = 3,
 }

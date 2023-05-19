@@ -30,4 +30,10 @@ public class TaskSqlType
 
     [DataMember(Order = 8)]
     public DateTime CreatedAt { get; set; }
+
+    [DataMember(Order = 9)]
+    public DateTime? FetchedAt { get; set; }
+
+    [DataMember(Order = 10)]
+    public DateTime? CompletedAt { get; set; }
 }

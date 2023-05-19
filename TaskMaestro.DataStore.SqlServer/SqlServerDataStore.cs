@@ -2,10 +2,14 @@
 
 using System.Data;
 using System.Data.SqlClient;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Microsoft.IO;
 
 public class SqlServerDataStore : IMaestroDataStore
 {
+    private static readonly RecyclableMemoryStreamManager MemoryStreamManager = new(1024, 1024, 128 * 1024);
+
     private readonly string connectionString;
 
     public SqlServerDataStore(string connectionString)
@@ -45,11 +49,8 @@ public class SqlServerDataStore : IMaestroDataStore
 INSERT maestro.Tasks (Id, [Type], [Input], InputType, AckCode, AckValueType, GroupId, HandlerType, CreatedAt)
 SELECT Id, [Type], [Input], InputType, AckCode, AckValueType, GroupId, HandlerType, CreatedAt FROM @Tasks;
 
-INSERT maestro.TaskWaitAcks (TaskId, Code)
-SELECT TaskId, Code FROM @TasksWaitAcks;
-
-INSERT maestro.TaskCompleteAcks (TaskId, Code)
-SELECT TaskId, Code FROM @TasksCompleteAcks;
+INSERT maestro.TaskAcks (TaskId, Code)
+SELECT TaskId, Code FROM @TasksAcks;
 ",
             connection,
             transaction);
@@ -58,8 +59,7 @@ SELECT TaskId, Code FROM @TasksCompleteAcks;
             new SqlParameter(
                 "Tasks",
                 tasks
-                    .OfType<MaestroTask>()
-                    .Select(x => MapTaskSqlType(x))
+                    .Select(x => ToTaskSqlType(x))
                     .ToDataReader())
             {
                 SqlDbType = SqlDbType.Structured,
@@ -68,24 +68,9 @@ SELECT TaskId, Code FROM @TasksCompleteAcks;
 
         cmd.Parameters.Add(
             new SqlParameter(
-                "TasksWaitAcks",
+                "TasksAcks",
                 tasks
-                    .OfType<MaestroTask>()
-                    .SelectMany(task => task.WaitForAcks.Select(ack => (task.Id, ack)))
-                    .Select(x => MapTaskAckSqlType(x.Id, x.ack))
-                    .ToDataReader())
-            {
-                SqlDbType = SqlDbType.Structured,
-                TypeName = "maestro.TaskAckType",
-            });
-
-        cmd.Parameters.Add(
-            new SqlParameter(
-                "TasksCompleteAcks",
-                tasks
-                    .OfType<MaestroTask>()
-                    .SelectMany(task => task.CompleteAcks.Select(ack => (task.Id, ack)))
-                    .Select(x => MapTaskAckSqlType(x.Id, x.ack))
+                    .SelectMany(x => ToTaskAckSqlType(x))
                     .ToDataReader())
             {
                 SqlDbType = SqlDbType.Structured,
@@ -95,36 +80,84 @@ SELECT TaskId, Code FROM @TasksCompleteAcks;
         await cmd.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private static TaskAckSqlType MapTaskAckSqlType(Guid taskId, AckCode ackCode)
+    private static IEnumerable<TaskAckSqlType> ToTaskAckSqlType(ITask task)
     {
-        return new TaskAckSqlType
+        var taskId = task.Id.ToByteArray();
+
+        foreach (var ack in task.WaitForAcks)
         {
-            TaskId = taskId.ToByteArray(),
-            Code = ackCode.Value
-        };
+            yield return new TaskAckSqlType
+            {
+                Code = ack.Value,
+                TaskId = taskId
+            };
+        }
     }
 
-    private static TaskSqlType MapTaskSqlType(MaestroTask task)
+    private static TaskSqlType ToTaskSqlType(ITask task)
     {
-        return new TaskSqlType
+        return task switch
         {
-            Id = task.Id.ToByteArray(),
-            Type = (byte)task.Type,
-            AckCode = task.AckCode.Value,
-            Input = SerializeObject(task.Input),
-            InputType = task.Input.GetType().AssemblyQualifiedName,
-            GroupId = task.Group?.Id.ToByteArray(),
-            AckValueType = task.AckValueType.AssemblyQualifiedName,
-            HandlerType = task.HandlerType.AssemblyQualifiedName,
-            CreatedAt = task.CreatedAt,
+            SyncTask syncTask => new TaskSqlType
+            {
+                Id = syncTask.Id.ToByteArray(),
+                Type = (byte)TaskType.Sync,
+                AckCode = syncTask.AckCode.Value,
+                Input = SerializeObject(syncTask.Input),
+                InputType = syncTask.Input.GetType().AssemblyQualifiedName,
+                GroupId = syncTask.GroupId?.ToByteArray(),
+                AckValueType = syncTask.AckValueType.AssemblyQualifiedName,
+                HandlerType = syncTask.HandlerType.AssemblyQualifiedName,
+                CreatedAt = syncTask.CreatedAt,
+            },
+            AsyncBeginTask asyncBeginTask => new TaskSqlType
+            {
+                Id = asyncBeginTask.Id.ToByteArray(),
+                Type = (byte)TaskType.AsyncBegin,
+                AckCode = asyncBeginTask.AckCode.Value,
+                Input = SerializeObject(asyncBeginTask.Input),
+                InputType = asyncBeginTask.Input.GetType().AssemblyQualifiedName,
+                GroupId = asyncBeginTask.GroupId?.ToByteArray(),
+                AckValueType = typeof(Void).AssemblyQualifiedName,
+                HandlerType = asyncBeginTask.HandlerType.AssemblyQualifiedName,
+                CreatedAt = asyncBeginTask.CreatedAt,
+            },
+            AsyncEndTask asyncEndTask => new TaskSqlType
+            {
+                Id = asyncEndTask.Id.ToByteArray(),
+                Type = (byte)TaskType.AsyncEnd,
+                AckCode = asyncEndTask.AckCode.Value,
+                Input = Array.Empty<byte>(),
+                InputType = string.Empty,
+                GroupId = null,
+                AckValueType = asyncEndTask.AckValueType.AssemblyQualifiedName,
+                HandlerType = asyncEndTask.HandlerType.AssemblyQualifiedName,
+                CreatedAt = asyncEndTask.CreatedAt,
+            },
+            _ => throw new InvalidOperationException("Task type is not supported")
         };
     }
 
     private static byte[] SerializeObject(object data)
     {
-        using var ms = new MemoryStream();
+        using var ms = MemoryStreamManager.GetStream();
         JsonSerializer.Serialize(ms, data);
         return ms.ToArray();
+    }
+
+    private static object? DeserializeObject(byte[]? data, Type type)
+    {
+        if (data is null)
+        {
+            return null;
+        }
+
+        if (data.Length == 0)
+        {
+            return new object();
+        }
+
+        return JsonSerializer.Deserialize(data, type);
     }
 
     public Task SaveAcksAsync(IEnumerable<Ack> acks, CancellationToken? cancellationToken)
@@ -132,8 +165,135 @@ SELECT TaskId, Code FROM @TasksCompleteAcks;
         throw new NotImplementedException();
     }
 
-    public Task<ITask> ConsumeTaskAsync(CancellationToken token)
+    public async IAsyncEnumerable<ITask> ConsumeTasksAsync(string queueName, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            while (true)
+            {
+                var task = await this.TryFetchTaskAsync(cancellationToken);
+
+                if (task is null)
+                {
+                    break;
+                }
+
+                yield return ToMaestroTask(task);
+            }
+
+            try
+            {
+                await Task.Delay(200, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+    }
+
+    private static ITask ToMaestroTask(TaskSqlType task)
+    {
+        return (TaskType)task.Type switch
+        {
+            TaskType.Sync => new SyncTask(
+                new Guid(task.Id),
+                new AckCode(task.AckCode),
+                DeserializeObject(task.Input, Type.GetType(task.InputType)),
+                Type.GetType(task.AckValueType),
+                task.GroupId is null ? null : new Guid(task.GroupId),
+                Array.Empty<AckCode>(), // TODO
+                Type.GetType(task.HandlerType),
+                task.CreatedAt,
+                task.FetchedAt,
+                task.CompletedAt),
+            TaskType.AsyncBegin => new AsyncBeginTask(
+                new Guid(task.Id),
+                new AckCode(task.AckCode),
+                DeserializeObject(task.Input, Type.GetType(task.InputType)),
+                Type.GetType(task.AckValueType),
+                task.GroupId is null ? null : new Guid(task.GroupId),
+                Array.Empty<AckCode>(), // TODO
+                Type.GetType(task.HandlerType),
+                task.CreatedAt,
+                task.FetchedAt,
+                task.CompletedAt),
+            TaskType.AsyncEnd => new AsyncEndTask(
+                new Guid(task.Id),
+                new AckCode(task.AckCode),
+                Type.GetType(task.AckValueType),
+                Array.Empty<AckCode>(), // TODO
+                Type.GetType(task.HandlerType),
+                task.CreatedAt,
+                task.FetchedAt,
+                task.CompletedAt),
+            _ => throw new InvalidOperationException()
+        };
+    }
+
+    private async Task<TaskSqlType?> TryFetchTaskAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var connection = new SqlConnection(this.connectionString);
+
+            await connection.OpenAsync(cancellationToken);
+
+            #region SQL
+
+            const string sql = @"
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+SET TRAN ISOLATION LEVEL READ COMMITTED;
+
+UPDATE maestro.Tasks
+SET FetchedAt = GETUTCDATE()
+OUTPUT inserted.Id, inserted.[Type], inserted.[Input], inserted.InputType, inserted.AckCode, inserted.AckValueType, inserted.GroupId, inserted.HandlerType, inserted.CreatedAt, inserted.FetchedAt, inserted.CompletedAt
+WHERE Id IN(
+	SELECT TOP(1) t.Id FROM maestro.Tasks t
+	WHERE
+		t.FetchedAt IS NULL AND
+		(
+			SELECT COUNT(*)
+			FROM maestro.TaskAcks ta
+			WHERE
+				ta.TaskId = t.Id AND
+				NOT EXISTS(
+					SELECT * FROM maestro.Acks a
+					WHERE a.Code = ta.Code)
+		) = 0
+	ORDER BY t.CreatedAt
+)
+";
+
+            #endregion
+
+            var command = new SqlCommand(sql, connection);
+
+            await using var dr = await command.ExecuteReaderAsync(CancellationToken.None);
+
+            if (!await dr.ReadAsync(CancellationToken.None))
+            {
+                return null;
+            }
+
+            return new TaskSqlType
+            {
+                Id = dr.GetSqlBinary(0).Value,
+                Type = dr.GetByte(1),
+                Input = dr.GetSqlBinary(2).Value,
+                InputType = dr.GetString(3),
+                AckCode = dr.GetSqlBinary(4).Value,
+                AckValueType = dr.GetString(5),
+                GroupId = dr.GetNullableBinary(6),
+                HandlerType = dr.GetString(7),
+                CreatedAt = dr.GetDateTime(8),
+                FetchedAt = dr.GetNullableDateTime(9),
+                CompletedAt = dr.GetNullableDateTime(10),
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
     }
 }

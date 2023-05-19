@@ -75,40 +75,36 @@ internal class TaskBuilder<TIn, TAckValue>
         return builder;
     }
 
-    public IAsyncTaskBuilder<TIn, TAckValue> EndsWith(params AckCode[] codes)
-    {
-        this.endAcks.AddRange(codes);
-        return this;
-    }
-
-    public IAsyncTaskBuilder<TIn, TAckValue> EndsWith(AckCode code)
-    {
-        this.endAcks.Add(code);
-        return this;
-    }
+    // public IAsyncTaskBuilder<TIn, TAckValue> EndsWith(params AckCode[] codes)
+    // {
+    //     this.endAcks.AddRange(codes);
+    //     return this;
+    // }
+    //
+    // public IAsyncTaskBuilder<TIn, TAckValue> EndsWith(AckCode code)
+    // {
+    //     this.endAcks.Add(code);
+    //     return this;
+    // }
 
     ITask IAsyncTaskBuilder<TIn, TAckValue>.Create()
     {
-        return new MaestroTask(
-            TaskType.Async,
+        return new AsyncBeginTask(
             this.input ?? new object(),
             typeof(TAckValue),
-            this.group,
+            this.group?.Id,
             this.waitForAcks,
-            this.handlerType,
-            this.endAcks);
+            this.handlerType);
     }
 
     ITask ISyncTaskBuilder<TIn, TAckValue>.Create()
     {
-        return new MaestroTask(
-            TaskType.Sync,
+        return new SyncTask(
             this.input ?? new object(),
             typeof(TAckValue),
-            this.group,
+            this.group?.Id,
             this.waitForAcks,
-            this.handlerType,
-            this.endAcks);
+            this.handlerType);
     }
 
     private TaskBuilder<TIn, TNewAck> NewBuilderType<TNewAck>()

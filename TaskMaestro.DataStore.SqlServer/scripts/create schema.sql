@@ -1,13 +1,14 @@
-DROP TABLE maestro.Tasks;
-DROP TABLE maestro.Acks;
-DROP TABLE maestro.TaskWaitAcks;
-DROP TABLE maestro.TaskCompleteAcks;
+DROP INDEX IF EXISTS Tasks_CreatedAt ON maestro.Tasks;
 
-DROP TYPE maestro.TaskType;
-DROP TYPE maestro.AckType;
-DROP TYPE maestro.TaskAckType;
+DROP TABLE IF EXISTS maestro.Tasks;
+DROP TABLE IF EXISTS maestro.Acks;
+DROP TABLE IF EXISTS maestro.TaskAcks;
 
-DROP SCHEMA maestro;
+DROP TYPE IF EXISTS maestro.TaskType;
+DROP TYPE IF EXISTS maestro.AckType;
+DROP TYPE IF EXISTS maestro.TaskAckType;
+
+DROP SCHEMA IF EXISTS maestro;
 
 CREATE SCHEMA maestro;
 
@@ -21,8 +22,11 @@ CREATE TABLE maestro.Tasks(
 	GroupId BINARY(16) NULL,
 	HandlerType NVARCHAR(500) NOT NULL,
 	CreatedAt DATETIME2 NOT NULL,
+	FetchedAt DATETIME2 NULL,
 	CompletedAt DATETIME2 NULL,
 );
+
+CREATE INDEX Tasks_CreatedAt ON maestro.Tasks(CreatedAt) WHERE FetchedAt IS NULL;
 
 CREATE TYPE maestro.TaskType AS TABLE(
 	Id BINARY(16) NOT NULL PRIMARY KEY,
@@ -33,7 +37,9 @@ CREATE TYPE maestro.TaskType AS TABLE(
 	AckValueType NVARCHAR(500) NOT NULL,
 	GroupId BINARY(16) NULL,
 	HandlerType NVARCHAR(500) NOT NULL,
-	CreatedAt DATETIME2 NOT NULL
+	CreatedAt DATETIME2 NOT NULL,
+	FetchedAt DATETIME2 NULL,
+	CompletedAt DATETIME2 NULL
 );
 
 CREATE TABLE maestro.Acks(
@@ -50,13 +56,7 @@ CREATE TYPE maestro.AckType AS TABLE(
 	CreatedAt DATETIME2 NOT NULL
 );
 
-CREATE TABLE maestro.TaskWaitAcks(
-	TaskId BINARY(16) NOT NULL,
-	Code BINARY(20) NOT NULL,
-	PRIMARY KEY(TaskId, Code)
-);
-
-CREATE TABLE maestro.TaskCompleteAcks(
+CREATE TABLE maestro.TaskAcks(
 	TaskId BINARY(16) NOT NULL,
 	Code BINARY(20) NOT NULL,
 	PRIMARY KEY(TaskId, Code)
@@ -67,4 +67,3 @@ CREATE TYPE maestro.TaskAckType AS TABLE(
 	Code VARBINARY(20) NOT NULL,
 	PRIMARY KEY(TaskId, Code)
 );
-
