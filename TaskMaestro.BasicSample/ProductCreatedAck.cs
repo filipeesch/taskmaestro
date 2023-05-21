@@ -1,1 +1,3 @@
-public record ProductCreatedAck(Guid CorrelationId);
+namespace TaskMaestro.BasicSample;
+
+public record ProductCreatedAck(int ProductId);

@@ -6,7 +6,7 @@ public interface ITask
 
     AckCode AckCode { get; }
 
-    IReadOnlyList<AckCode> WaitForAcks { get; }
+    IReadOnlyCollection<AckCode> WaitForAcks { get; }
 
     Type HandlerType { get; }
 }

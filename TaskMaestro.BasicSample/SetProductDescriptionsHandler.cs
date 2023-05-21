@@ -1,8 +1,12 @@
+namespace TaskMaestro.BasicSample;
+
 public class SetProductDescriptionsHandler
     : ISyncTaskHandler<ProductInputData, Void>
 {
-    public Task<TaskResult<Void>> HandleAsync(ProductInputData input, IHandlerContext context, CancellationToken cancellationToken)
+    public Task<SyncTaskResult<Void>> HandleAsync(ProductInputData input, IHandlerContext context, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        Console.WriteLine("Descriptions saved");
+
+        return Task.FromResult(new SyncTaskResult<Void>(Void.Value));
     }
 }

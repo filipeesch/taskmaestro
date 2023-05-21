@@ -2,17 +2,19 @@ namespace TaskMaestro;
 
 public class TaskExecutor : ITaskExecutor
 {
+    private readonly IMaestroManager manager;
     private readonly IServiceProvider serviceProvider;
     private readonly Dictionary<Type, ITaskExecutorStrategy> strategies;
 
-    public TaskExecutor(IServiceProvider serviceProvider)
+    public TaskExecutor(IMaestroManager manager, IServiceProvider serviceProvider)
     {
+        this.manager = manager;
         this.serviceProvider = serviceProvider;
         this.strategies = new Dictionary<Type, ITaskExecutorStrategy>
         {
-            { typeof(SyncTask), new SyncTaskExecutorStrategy() },
-            { typeof(AsyncBeginTask), new AsyncBeginTaskExecutorStrategy() },
-            { typeof(AsyncEndTask), new AsyncEndTaskExecutorStrategy() },
+            { typeof(SyncTask), new SyncTaskExecutorStrategy(this.manager) },
+            { typeof(AsyncBeginTask), new AsyncBeginTaskExecutorStrategy(this.manager) },
+            { typeof(AsyncEndTask), new AsyncEndTaskExecutorStrategy(this.manager) },
         };
     }
 

@@ -1,4 +1,4 @@
-namespace TaskMaestro.DataStore.SqlServer;
+namespace TaskMaestro.DataStore.SqlServer.SqlTypes;
 
 using System.Runtime.Serialization;
 

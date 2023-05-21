@@ -57,7 +57,7 @@ public class SyncTask : ITask
 
     public Guid? GroupId { get; }
 
-    public IReadOnlyList<AckCode> WaitForAcks { get; }
+    public IReadOnlyCollection<AckCode> WaitForAcks { get; }
 
     public Type HandlerType { get; }
 

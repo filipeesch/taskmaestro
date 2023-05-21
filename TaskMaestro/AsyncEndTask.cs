@@ -3,15 +3,20 @@ namespace TaskMaestro;
 public class AsyncEndTask : ITask
 {
     public AsyncEndTask(
+        AckCode ackCode,
         Type ackValueType,
-        IReadOnlyList<AckCode> waitForAcks,
-        Type? handlerType)
+        IReadOnlyCollection<AckCode> waitForAcks,
+        Type? handlerType,
+        Type inputType,
+        object input)
     {
         this.Id = Guid.NewGuid();
-        this.AckCode = AckCode.FromGuid(Guid.NewGuid());
+        this.AckCode = ackCode;
         this.AckValueType = ackValueType;
         this.WaitForAcks = waitForAcks;
         this.HandlerType = handlerType;
+        this.InputType = inputType;
+        this.Input = input;
         this.CreatedAt = DateTime.UtcNow;
     }
 
@@ -19,7 +24,9 @@ public class AsyncEndTask : ITask
         Guid id,
         AckCode ackCode,
         Type ackValueType,
-        IReadOnlyList<AckCode> waitForAcks,
+        object input,
+        Type inputType,
+        IReadOnlyCollection<AckCode> waitForAcks,
         Type? handlerType,
         DateTime createdAt,
         DateTime? fetchedAt,
@@ -28,6 +35,8 @@ public class AsyncEndTask : ITask
         this.Id = id;
         this.AckCode = ackCode;
         this.AckValueType = ackValueType;
+        this.Input = input;
+        this.InputType = inputType;
         this.WaitForAcks = waitForAcks;
         this.HandlerType = handlerType;
         this.CreatedAt = createdAt;
@@ -41,11 +50,13 @@ public class AsyncEndTask : ITask
 
     public Type AckValueType { get; }
 
-    public IReadOnlyList<AckCode> WaitForAcks { get; }
+    public object Input { get; }
+
+    public Type InputType { get; }
+
+    public IReadOnlyCollection<AckCode> WaitForAcks { get; }
 
     public Type? HandlerType { get; }
-
-    public object Input { get; }
 
     public DateTime CreatedAt { get; }
 

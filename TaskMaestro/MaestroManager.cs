@@ -1,22 +1,13 @@
 namespace TaskMaestro;
 
-using TaskMaestro.Builders;
-
-public class Maestro : IMaestro
+public class MaestroManager : IMaestroManager
 {
     private readonly IMaestroDataStore dataStore;
 
-    public Maestro(IMaestroDataStore dataStore)
+    public MaestroManager(IMaestroDataStore dataStore)
     {
         this.dataStore = dataStore;
     }
-
-    public ITaskGroupBuilder BuildTaskGroup()
-    {
-        throw new NotImplementedException();
-    }
-
-    public ITaskBuilder BuildTask() => new TaskBuilder<Void, Void>();
 
     public ITask GetTaskAsync(Guid id)
     {
@@ -33,5 +24,10 @@ public class Maestro : IMaestro
     public async Task RegisterAcksAsync(IEnumerable<Ack> acks, CancellationToken cancellationToken)
     {
         await this.dataStore.SaveAcksAsync(acks, cancellationToken);
+    }
+
+    public async Task WaitForAsync(AckCode ackCode)
+    {
+        throw new NotImplementedException();
     }
 }

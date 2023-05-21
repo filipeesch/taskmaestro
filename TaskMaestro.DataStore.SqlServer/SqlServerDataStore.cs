@@ -5,6 +5,7 @@ using System.Data.SqlClient;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.IO;
+using TaskMaestro.DataStore.SqlServer.SqlTypes;
 
 public class SqlServerDataStore : IMaestroDataStore
 {
@@ -118,7 +119,7 @@ SELECT TaskId, Code FROM @TasksAcks;
                 Input = SerializeObject(asyncBeginTask.Input),
                 InputType = asyncBeginTask.Input.GetType().AssemblyQualifiedName,
                 GroupId = asyncBeginTask.GroupId?.ToByteArray(),
-                AckValueType = typeof(Void).AssemblyQualifiedName,
+                AckValueType = asyncBeginTask.AckValueType.AssemblyQualifiedName,
                 HandlerType = asyncBeginTask.HandlerType.AssemblyQualifiedName,
                 CreatedAt = asyncBeginTask.CreatedAt,
             },
@@ -127,8 +128,8 @@ SELECT TaskId, Code FROM @TasksAcks;
                 Id = asyncEndTask.Id.ToByteArray(),
                 Type = (byte)TaskType.AsyncEnd,
                 AckCode = asyncEndTask.AckCode.Value,
-                Input = Array.Empty<byte>(),
-                InputType = string.Empty,
+                Input = SerializeObject(asyncEndTask.Input),
+                InputType = asyncEndTask.Input.GetType().AssemblyQualifiedName,
                 GroupId = null,
                 AckValueType = asyncEndTask.AckValueType.AssemblyQualifiedName,
                 HandlerType = asyncEndTask.HandlerType.AssemblyQualifiedName,
@@ -160,9 +161,42 @@ SELECT TaskId, Code FROM @TasksAcks;
         return JsonSerializer.Deserialize(data, type);
     }
 
-    public Task SaveAcksAsync(IEnumerable<Ack> acks, CancellationToken? cancellationToken)
+    public async Task SaveAcksAsync(IEnumerable<Ack> acks, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        await using var connection = new SqlConnection(this.connectionString);
+
+        await using var cmd = new SqlCommand(
+            @"
+INSERT maestro.Acks (Code, [Value], ValueType, CreatedAt)
+SELECT Code, [Value], ValueType, CreatedAt FROM @Acks;
+",
+            connection);
+
+        cmd.Parameters.Add(
+            new SqlParameter(
+                "Acks",
+                acks
+                    .Select(x => ToAckSqlType(x))
+                    .ToDataReader())
+            {
+                SqlDbType = SqlDbType.Structured,
+                TypeName = "maestro.AckType",
+            });
+
+        await connection.OpenAsync(cancellationToken);
+
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private AckSqlType ToAckSqlType(Ack ack)
+    {
+        return new AckSqlType
+        {
+            Code = ack.Code.Value,
+            Value = SerializeObject(ack.Value),
+            ValueType = ack.Value.GetType().AssemblyQualifiedName,
+            CreatedAt = ack.CreatedAt,
+        };
     }
 
     public async IAsyncEnumerable<ITask> ConsumeTasksAsync(string queueName, [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -221,6 +255,8 @@ SELECT TaskId, Code FROM @TasksAcks;
                 new Guid(task.Id),
                 new AckCode(task.AckCode),
                 Type.GetType(task.AckValueType),
+                DeserializeObject(task.Input, Type.GetType(task.InputType)),
+                Type.GetType(task.InputType),
                 Array.Empty<AckCode>(), // TODO
                 Type.GetType(task.HandlerType),
                 task.CreatedAt,
@@ -284,11 +320,11 @@ WHERE Id IN(
                 InputType = dr.GetString(3),
                 AckCode = dr.GetSqlBinary(4).Value,
                 AckValueType = dr.GetString(5),
-                GroupId = dr.GetNullableBinary(6),
+                GroupId = dr.GetNullable<byte[]>(6),
                 HandlerType = dr.GetString(7),
                 CreatedAt = dr.GetDateTime(8),
-                FetchedAt = dr.GetNullableDateTime(9),
-                CompletedAt = dr.GetNullableDateTime(10),
+                FetchedAt = dr.GetNullable<DateTime?>(9),
+                CompletedAt = dr.GetNullable<DateTime?>(10),
             };
         }
         catch (OperationCanceledException)

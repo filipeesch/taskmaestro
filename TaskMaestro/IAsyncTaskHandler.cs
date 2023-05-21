@@ -1,6 +1,8 @@
+namespace TaskMaestro;
+
 public interface IAsyncTaskHandler<in TInput, TAckValue>
 {
-    Task<AsyncBeginResult> HandleBeginAsync(TInput input, IHandlerContext context, CancellationToken cancellationToken);
+    Task<AsyncBeginTaskResult> HandleBeginAsync(TInput input, IHandlerContext context, CancellationToken cancellationToken);
 
-    Task<TAckValue> HandleEndAsync(IHandlerContext context, CancellationToken cancellationToken);
+    Task<AsyncEndTaskResult<TAckValue>> HandleEndAsync(TInput input, IHandlerContext context, CancellationToken cancellationToken);
 }

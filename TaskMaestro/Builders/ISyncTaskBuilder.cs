@@ -1,4 +1,4 @@
-using TaskMaestro;
+namespace TaskMaestro.Builders;
 
 public interface ISyncTaskBuilder<TIn, TOut>
 {

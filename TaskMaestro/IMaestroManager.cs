@@ -1,12 +1,9 @@
-using TaskMaestro;
-using TaskMaestro.Builders;
+namespace TaskMaestro;
 
-public interface IMaestro
+using System.Runtime.CompilerServices;
+
+public interface IMaestroManager
 {
-    ITaskGroupBuilder BuildTaskGroup();
-
-    ITaskBuilder BuildTask();
-
     ITask GetTaskAsync(Guid id);
 
     Task SaveAsync(IReadOnlyCollection<ITask> tasks, CancellationToken cancellationToken = default);

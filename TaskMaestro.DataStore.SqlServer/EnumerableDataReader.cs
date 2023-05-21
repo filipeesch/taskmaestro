@@ -183,7 +183,21 @@ internal class EnumerableDataReader<T> : DbDataReader
         long dataOffset,
         char[]? buffer,
         int bufferOffset,
-        int length) => throw new NotSupportedException();
+        int length)
+    {
+        var value = (string)this.GetValue(ordinal);
+
+        var writeCount = Math.Min(value.Length - dataOffset, length);
+
+        if (writeCount == 0)
+        {
+            return 0;
+        }
+
+        value.AsSpan((int)dataOffset, (int)writeCount).CopyTo(buffer.AsSpan(bufferOffset));
+
+        return writeCount;
+    }
 
     public override string GetDataTypeName(int ordinal) => throw new NotSupportedException();
 

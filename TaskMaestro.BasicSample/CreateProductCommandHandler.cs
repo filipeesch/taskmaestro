@@ -1,12 +1,22 @@
+namespace TaskMaestro.BasicSample;
+
 public class CreateProductCommandHandler : IAsyncTaskHandler<ProductInputData, ProductCreatedAck>
 {
-    public Task<AsyncBeginResult> HandleBeginAsync(ProductInputData input, IHandlerContext context, CancellationToken cancellationToken)
+    public Task<AsyncBeginTaskResult> HandleBeginAsync(ProductInputData input, IHandlerContext context, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        Console.WriteLine("Saving product: " + input.Name);
+
+        return Task.FromResult(new AsyncBeginTaskResult());
     }
 
-    public Task<ProductCreatedAck> HandleEndAsync(IHandlerContext context, CancellationToken cancellationToken)
+    public Task<AsyncEndTaskResult<ProductCreatedAck>> HandleEndAsync(
+        ProductInputData input,
+        IHandlerContext context,
+        CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var productId = new Random().Next(1000, 9999);
+        Console.WriteLine($"Product saved: Id={productId}, Name={input.Name}");
+
+        return Task.FromResult(new AsyncEndTaskResult<ProductCreatedAck>(new ProductCreatedAck(productId)));
     }
 }

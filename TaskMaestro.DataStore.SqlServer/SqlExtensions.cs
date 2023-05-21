@@ -4,17 +4,10 @@ using System.Data.SqlClient;
 
 internal static class SqlExtensions
 {
-    public static DateTime? GetNullableDateTime(this SqlDataReader dr, int order)
+    public static T? GetNullable<T>(this SqlDataReader dr, int order)
     {
-        var value = dr.GetSqlDateTime(order);
+        var value = dr.GetValue(order);
 
-        return value.IsNull ? null : value.Value;
-    }
-
-    public static byte[]? GetNullableBinary(this SqlDataReader dr, int order)
-    {
-        var value = dr.GetSqlBinary(order);
-
-        return value.IsNull ? null : value.Value;
+        return value == DBNull.Value ? default : (T?)value;
     }
 }

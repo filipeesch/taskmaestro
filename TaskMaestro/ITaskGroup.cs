@@ -1,4 +1,4 @@
-using TaskMaestro;
+namespace TaskMaestro;
 
 public interface ITaskGroup : ITask
 {

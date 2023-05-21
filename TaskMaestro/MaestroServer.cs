@@ -1,6 +1,6 @@
 namespace TaskMaestro;
 
-public class MaestroServer : IDisposable
+public class MaestroServer : IMaestroServer
 {
     private readonly IWorkerFactory workerFactory;
     private readonly MaestroQueue[] queues;
