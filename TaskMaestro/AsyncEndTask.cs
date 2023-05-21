@@ -8,7 +8,8 @@ public class AsyncEndTask : ITask
         IReadOnlyCollection<AckCode> waitForAcks,
         Type? handlerType,
         Type inputType,
-        object input)
+        object input,
+        DateTime createdAt)
     {
         this.Id = Guid.NewGuid();
         this.AckCode = ackCode;
@@ -17,7 +18,7 @@ public class AsyncEndTask : ITask
         this.HandlerType = handlerType;
         this.InputType = inputType;
         this.Input = input;
-        this.CreatedAt = DateTime.UtcNow;
+        this.CreatedAt = createdAt;
     }
 
     public AsyncEndTask(

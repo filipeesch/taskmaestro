@@ -37,7 +37,8 @@ internal class AsyncBeginTaskExecutorStrategy : ITaskExecutorStrategy
             asyncBeginResult.CompleteAckCodes,
             asyncBeginTask.HandlerType,
             asyncBeginTask.InputType,
-            asyncBeginTask.Input);
+            asyncBeginTask.Input,
+            asyncBeginTask.CreatedAt);
 
         await this.manager.SaveAsync(asyncEndTask, CancellationToken.None);
     }

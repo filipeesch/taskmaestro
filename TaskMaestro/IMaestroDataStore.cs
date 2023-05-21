@@ -7,4 +7,6 @@ public interface IMaestroDataStore
     Task SaveAcksAsync(IEnumerable<Ack> acks, CancellationToken cancellationToken);
 
     IAsyncEnumerable<ITask> ConsumeTasksAsync(string queueName, CancellationToken token);
+
+    Task<object> GetAckValueByTypeAsync(Guid taskId, Type type, CancellationToken cancellationToken);
 }

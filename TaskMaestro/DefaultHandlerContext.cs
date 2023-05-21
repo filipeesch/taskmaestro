@@ -2,9 +2,20 @@ namespace TaskMaestro;
 
 public class DefaultHandlerContext : IHandlerContext
 {
-    public Task<TAckValue> GetAckValueByType<TAckValue>(CancellationToken cancellationToken)
+    private readonly IMaestroDataStore dataStore;
+    private readonly ITask task;
+
+    public DefaultHandlerContext(IMaestroDataStore dataStore, ITask task)
     {
-        throw new NotImplementedException();
+        this.dataStore = dataStore;
+        this.task = task;
+    }
+
+    public async Task<TAckValue> GetAckValueByType<TAckValue>(CancellationToken cancellationToken)
+    {
+        var value = await this.dataStore.GetAckValueByTypeAsync(this.task.Id, typeof(TAckValue), cancellationToken);
+
+        return (TAckValue)value;
     }
 
     public Task<(TAckValue1, TAckValue2, TAckValue3, TAckValue4, TAckValue5, TAckValue6)>

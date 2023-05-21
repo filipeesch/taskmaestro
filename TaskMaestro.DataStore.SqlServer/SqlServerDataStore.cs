@@ -225,6 +225,73 @@ SELECT Code, [Value], ValueType, CreatedAt FROM @Acks;
         }
     }
 
+    public async Task<object> GetAckValueByTypeAsync(Guid taskId, Type type, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var connection = new SqlConnection(this.connectionString);
+
+            await connection.OpenAsync(cancellationToken);
+
+            #region SQL
+
+            const string sql = @"
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+SET TRAN ISOLATION LEVEL READ COMMITTED;
+
+UPDATE maestro.Tasks
+SET FetchedAt = GETUTCDATE()
+OUTPUT inserted.Id, inserted.[Type], inserted.[Input], inserted.InputType, inserted.AckCode, inserted.AckValueType, inserted.GroupId, inserted.HandlerType, inserted.CreatedAt, inserted.FetchedAt, inserted.CompletedAt
+WHERE Id IN(
+	SELECT TOP(1) t.Id FROM maestro.Tasks t
+	WHERE
+		t.FetchedAt IS NULL AND
+		(
+			SELECT COUNT(*)
+			FROM maestro.TaskAcks ta
+			WHERE
+				ta.TaskId = t.Id AND
+				NOT EXISTS(
+					SELECT * FROM maestro.Acks a
+					WHERE a.Code = ta.Code)
+		) = 0
+	ORDER BY t.CreatedAt
+)
+";
+
+            #endregion
+
+            var command = new SqlCommand(sql, connection);
+
+            await using var dr = await command.ExecuteReaderAsync(CancellationToken.None);
+
+            if (!await dr.ReadAsync(CancellationToken.None))
+            {
+                return null;
+            }
+
+            return new TaskSqlType
+            {
+                Id = dr.GetSqlBinary(0).Value,
+                Type = dr.GetByte(1),
+                Input = dr.GetSqlBinary(2).Value,
+                InputType = dr.GetString(3),
+                AckCode = dr.GetSqlBinary(4).Value,
+                AckValueType = dr.GetString(5),
+                GroupId = dr.GetNullable<byte[]>(6),
+                HandlerType = dr.GetString(7),
+                CreatedAt = dr.GetDateTime(8),
+                FetchedAt = dr.GetNullable<DateTime?>(9),
+                CompletedAt = dr.GetNullable<DateTime?>(10),
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
     private static ITask ToMaestroTask(TaskSqlType task)
     {
         return (TaskType)task.Type switch
@@ -285,7 +352,7 @@ UPDATE maestro.Tasks
 SET FetchedAt = GETUTCDATE()
 OUTPUT inserted.Id, inserted.[Type], inserted.[Input], inserted.InputType, inserted.AckCode, inserted.AckValueType, inserted.GroupId, inserted.HandlerType, inserted.CreatedAt, inserted.FetchedAt, inserted.CompletedAt
 WHERE Id IN(
-	SELECT TOP(1) t.Id FROM maestro.Tasks t
+	SELECT TOP(1) t.Id FROM maestro.Tasks t WITH (UPDLOCK, ROWLOCK)
 	WHERE
 		t.FetchedAt IS NULL AND
 		(

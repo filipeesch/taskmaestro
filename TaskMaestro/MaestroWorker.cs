@@ -35,7 +35,7 @@ public class MaestroWorker : IMaestroWorker
                                            this.queueName,
                                            this.stopCancellationTokenSource.Token))
                         {
-                            var context = new DefaultHandlerContext();
+                            var context = new DefaultHandlerContext(this.dataStore, task);
                             await this.executor.ExecuteAsync(task, context, this.stopCancellationTokenSource.Token);
                         }
                     }
