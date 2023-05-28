@@ -13,6 +13,7 @@ internal class TaskBuilder<TIn, TAckValue>
     private List<AckCode> waitForAcks = new();
     private Type? handlerType;
     private List<AckCode> endAcks = new();
+    private int maxRetryCount = 10;
 
     public ITaskBuilder InGroup(ITaskGroup? group)
     {
@@ -87,24 +88,28 @@ internal class TaskBuilder<TIn, TAckValue>
     //     return this;
     // }
 
-    ITask IAsyncTaskBuilder<TIn, TAckValue>.Create()
+    ITask IAsyncTaskBuilder<TIn, TAckValue>.Create(string queue = Constants.DefaultQueueName)
     {
         return new AsyncBeginTask(
             this.input ?? new object(),
             typeof(TAckValue),
             this.group?.Id,
             this.waitForAcks,
-            this.handlerType);
+            this.handlerType,
+            queue,
+            this.maxRetryCount);
     }
 
-    ITask ISyncTaskBuilder<TIn, TAckValue>.Create()
+    ITask ISyncTaskBuilder<TIn, TAckValue>.Create(string queue = Constants.DefaultQueueName)
     {
         return new SyncTask(
             this.input ?? new object(),
             typeof(TAckValue),
             this.group?.Id,
             this.waitForAcks,
-            this.handlerType);
+            this.handlerType,
+            queue,
+            this.maxRetryCount);
     }
 
     private TaskBuilder<TIn, TNewAck> NewBuilderType<TNewAck>()

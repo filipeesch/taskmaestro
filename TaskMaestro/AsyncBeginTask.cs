@@ -7,19 +7,24 @@ public class AsyncBeginTask : ITask
         Type ackValueType,
         Guid? groupId,
         IReadOnlyList<AckCode> waitForAcks,
-        Type? handlerType)
+        Type? handlerType,
+        string queue,
+        int maxRetryCount)
     {
-        this.Id = Guid.NewGuid();
-        this.AckCode = AckCode.FromGuid(Guid.NewGuid());
+        this.Id = GuidGenerator.New();
+        this.AckCode = AckCode.FromGuid(GuidGenerator.New());
         this.AckValueType = ackValueType;
         this.Input = input;
         this.InputType = input.GetType();
         this.GroupId = groupId;
         this.WaitForAcks = waitForAcks;
         this.HandlerType = handlerType;
+        this.Queue = queue;
         this.CreatedAt = DateTime.UtcNow;
+        this.Status = TaskStatus.Created;
+        this.MaxRetryCount = maxRetryCount;
     }
-    
+
     public AsyncBeginTask(
         Guid id,
         AckCode ackCode,
@@ -28,9 +33,13 @@ public class AsyncBeginTask : ITask
         Guid? groupId,
         IReadOnlyList<AckCode> waitForAcks,
         Type? handlerType,
+        string queue,
         DateTime createdAt,
         DateTime? fetchedAt,
-        DateTime? completedAt)
+        DateTime? completedAt,
+        TaskStatus status,
+        int maxRetryCount,
+        int currentRetryCount)
     {
         this.Id = id;
         this.AckCode = ackCode;
@@ -40,9 +49,13 @@ public class AsyncBeginTask : ITask
         this.GroupId = groupId;
         this.WaitForAcks = waitForAcks;
         this.HandlerType = handlerType;
+        this.Queue = queue;
         this.CreatedAt = createdAt;
         this.FetchedAt = fetchedAt;
         this.CompletedAt = completedAt;
+        this.Status = status;
+        this.MaxRetryCount = maxRetryCount;
+        this.CurrentRetryCount = currentRetryCount;
     }
 
     public Guid Id { get; }
@@ -61,9 +74,17 @@ public class AsyncBeginTask : ITask
 
     public Type? HandlerType { get; }
 
+    public string Queue { get; }
+
     public DateTime CreatedAt { get; }
 
     public DateTime? FetchedAt { get; }
 
     public DateTime? CompletedAt { get; }
+
+    public TaskStatus Status { get; }
+
+    public int MaxRetryCount { get; }
+
+    public int CurrentRetryCount { get; }
 }

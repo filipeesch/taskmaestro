@@ -68,7 +68,7 @@ IReadOnlyCollection<ITask> CreateTask(string productName)
 
     var productTask = builder
         .BuildTask()
-        // .InGroup(saveProductGroup)
+        //.InGroup(saveProductGroup)
         .Input(productInput)
         .Produces<ProductCreatedAck>()
         .Async<CreateProductCommandHandler>()

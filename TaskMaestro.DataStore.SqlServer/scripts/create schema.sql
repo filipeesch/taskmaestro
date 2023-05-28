@@ -21,12 +21,24 @@ CREATE TABLE maestro.Tasks(
 	AckValueType NVARCHAR(500) NOT NULL,
 	GroupId BINARY(16) NULL,
 	HandlerType NVARCHAR(500) NOT NULL,
+	Queue NVARCHAR(100) NOT NULL,
 	CreatedAt DATETIME2 NOT NULL,
 	FetchedAt DATETIME2 NULL,
 	CompletedAt DATETIME2 NULL,
+	Status TINYINT NOT NULL,
+	MaxRetryCount INT NOT NULL,
+	CurrentRetryCount INT NOT NULL
 );
 
-CREATE INDEX Tasks_CreatedAt ON maestro.Tasks(CreatedAt) WHERE FetchedAt IS NULL;
+CREATE INDEX Tasks_CreatedAt ON maestro.Tasks(Queue, CreatedAt) WHERE FetchedAt IS NULL;
+
+CREATE TABLE maestro.TaskExecutionReports(
+	Id INT IDENTITY(1,1) PRIMARY KEY,
+	TaskId BINARY(16) NOT NULL
+	[Type] TINYINT NOT NULL,
+	Message VARCHAR(MAX) NULL,
+	CreatedAt DATETIME2 NOT NULL
+);
 
 CREATE TYPE maestro.TaskType AS TABLE(
 	Id BINARY(16) NOT NULL PRIMARY KEY,
@@ -37,9 +49,13 @@ CREATE TYPE maestro.TaskType AS TABLE(
 	AckValueType NVARCHAR(500) NOT NULL,
 	GroupId BINARY(16) NULL,
 	HandlerType NVARCHAR(500) NOT NULL,
+	Queue NVARCHAR(100) NOT NULL,
 	CreatedAt DATETIME2 NOT NULL,
 	FetchedAt DATETIME2 NULL,
-	CompletedAt DATETIME2 NULL
+	CompletedAt DATETIME2 NULL,
+	Status TINYINT NOT NULL,
+	MaxRetryCount INT NOT NULL,
+	CurrentRetryCount INT NOT NULL
 );
 
 CREATE TABLE maestro.Acks(
@@ -50,7 +66,7 @@ CREATE TABLE maestro.Acks(
 );
 
 CREATE TYPE maestro.AckType AS TABLE(
-	Code VARBINARY(20) NOT NULL PRIMARY KEY,
+	Code BINARY(20) NOT NULL PRIMARY KEY,
 	[Value] VARBINARY(MAX) NOT NULL,
 	ValueType NVARCHAR(500) NOT NULL,
 	CreatedAt DATETIME2 NOT NULL
@@ -63,7 +79,7 @@ CREATE TABLE maestro.TaskAcks(
 );
 
 CREATE TYPE maestro.TaskAckType AS TABLE(
-	TaskId VARBINARY(16) NOT NULL,
-	Code VARBINARY(20) NOT NULL,
+	TaskId BINARY(16) NOT NULL,
+	Code BINARY(20) NOT NULL,
 	PRIMARY KEY(TaskId, Code)
 );

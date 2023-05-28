@@ -29,11 +29,23 @@ public class TaskSqlType
     public string HandlerType { get; set; }
 
     [DataMember(Order = 8)]
-    public DateTime CreatedAt { get; set; }
+    public string Queue { get; set; }
 
     [DataMember(Order = 9)]
-    public DateTime? FetchedAt { get; set; }
+    public DateTime CreatedAt { get; set; }
 
     [DataMember(Order = 10)]
+    public DateTime? FetchedAt { get; set; }
+
+    [DataMember(Order = 11)]
     public DateTime? CompletedAt { get; set; }
+
+    [DataMember(Order = 12)]
+    public byte Status { get; set; }
+
+    [DataMember(Order = 13)]
+    public int MaxRetryCount { get; set; }
+
+    [DataMember(Order = 14)]
+    public int CurrentRetryCount { get; set; }
 }

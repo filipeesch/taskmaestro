@@ -2,23 +2,19 @@ namespace TaskMaestro;
 
 public class AsyncEndTask : ITask
 {
-    public AsyncEndTask(
-        AckCode ackCode,
-        Type ackValueType,
-        IReadOnlyCollection<AckCode> waitForAcks,
-        Type? handlerType,
-        Type inputType,
-        object input,
-        DateTime createdAt)
+    public AsyncEndTask(AsyncBeginTask beginTask, IReadOnlyCollection<AckCode> waitForAckCodes)
     {
-        this.Id = Guid.NewGuid();
-        this.AckCode = ackCode;
-        this.AckValueType = ackValueType;
-        this.WaitForAcks = waitForAcks;
-        this.HandlerType = handlerType;
-        this.InputType = inputType;
-        this.Input = input;
-        this.CreatedAt = createdAt;
+        this.Id = GuidGenerator.New();
+        this.AckCode = beginTask.AckCode;
+        this.AckValueType = beginTask.AckValueType;
+        this.WaitForAcks = waitForAckCodes;
+        this.HandlerType = beginTask.HandlerType;
+        this.InputType = beginTask.InputType;
+        this.Input = beginTask.Input;
+        this.Queue = beginTask.Queue;
+        this.CreatedAt = beginTask.CreatedAt;
+        this.Status = TaskStatus.Created;
+        this.MaxRetryCount = beginTask.MaxRetryCount;
     }
 
     public AsyncEndTask(
@@ -29,9 +25,13 @@ public class AsyncEndTask : ITask
         Type inputType,
         IReadOnlyCollection<AckCode> waitForAcks,
         Type? handlerType,
+        string queue,
         DateTime createdAt,
         DateTime? fetchedAt,
-        DateTime? completedAt)
+        DateTime? completedAt,
+        TaskStatus status,
+        int maxRetryCount,
+        int currentRetryCount)
     {
         this.Id = id;
         this.AckCode = ackCode;
@@ -40,9 +40,13 @@ public class AsyncEndTask : ITask
         this.InputType = inputType;
         this.WaitForAcks = waitForAcks;
         this.HandlerType = handlerType;
+        this.Queue = queue;
         this.CreatedAt = createdAt;
         this.FetchedAt = fetchedAt;
         this.CompletedAt = completedAt;
+        this.Status = status;
+        this.MaxRetryCount = maxRetryCount;
+        this.CurrentRetryCount = currentRetryCount;
     }
 
     public Guid Id { get; }
@@ -52,6 +56,8 @@ public class AsyncEndTask : ITask
     public Type AckValueType { get; }
 
     public object Input { get; }
+
+    public string Queue { get; }
 
     public Type InputType { get; }
 
@@ -64,4 +70,10 @@ public class AsyncEndTask : ITask
     public DateTime? FetchedAt { get; }
 
     public DateTime? CompletedAt { get; }
+
+    public TaskStatus Status { get; }
+
+    public int MaxRetryCount { get; }
+
+    public int CurrentRetryCount { get; }
 }

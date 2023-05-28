@@ -31,14 +31,7 @@ internal class AsyncBeginTaskExecutorStrategy : ITaskExecutorStrategy
 
     private async Task CreateEndTaskAsync(AsyncBeginTask asyncBeginTask, AsyncBeginTaskResult asyncBeginResult)
     {
-        var asyncEndTask = new AsyncEndTask(
-            asyncBeginTask.AckCode,
-            asyncBeginTask.AckValueType,
-            asyncBeginResult.CompleteAckCodes,
-            asyncBeginTask.HandlerType,
-            asyncBeginTask.InputType,
-            asyncBeginTask.Input,
-            asyncBeginTask.CreatedAt);
+        var asyncEndTask = new AsyncEndTask(asyncBeginTask, asyncBeginResult.CompleteAckCodes);
 
         await this.manager.SaveAsync(asyncEndTask, CancellationToken.None);
     }

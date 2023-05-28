@@ -3,12 +3,14 @@ namespace TaskMaestro;
 public class TaskExecutor : ITaskExecutor
 {
     private readonly IMaestroManager manager;
+    private readonly IMaestroDataStore dataStore;
     private readonly IServiceProvider serviceProvider;
     private readonly Dictionary<Type, ITaskExecutorStrategy> strategies;
 
-    public TaskExecutor(IMaestroManager manager, IServiceProvider serviceProvider)
+    public TaskExecutor(IMaestroManager manager, IMaestroDataStore dataStore, IServiceProvider serviceProvider)
     {
         this.manager = manager;
+        this.dataStore = dataStore;
         this.serviceProvider = serviceProvider;
         this.strategies = new Dictionary<Type, ITaskExecutorStrategy>
         {
@@ -27,6 +29,18 @@ public class TaskExecutor : ITaskExecutor
             throw new InvalidOperationException($"Handler '{task.HandlerType.FullName}' is not registered in the DI container");
         }
 
-        var result = await this.strategies[task.GetType()].ExecuteAsync(task, handler, context, cancellationToken);
+        TaskExecutionReport report;
+
+        try
+        {
+            var result = await this.strategies[task.GetType()].ExecuteAsync(task, handler, context, cancellationToken);
+            report = new TaskExecutionReport(task.Id, TaskExecutionReportType.Success, string.Empty);
+        }
+        catch (Exception e)
+        {
+            report = new TaskExecutionReport(task.Id, TaskExecutionReportType.Error, e.ToString());
+        }
+
+        await this.dataStore.CompleteTaskAsync(report, cancellationToken);
     }
 }

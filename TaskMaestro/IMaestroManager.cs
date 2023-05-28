@@ -1,7 +1,5 @@
 namespace TaskMaestro;
 
-using System.Runtime.CompilerServices;
-
 public interface IMaestroManager
 {
     ITask GetTaskAsync(Guid id);

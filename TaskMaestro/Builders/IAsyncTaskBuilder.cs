@@ -8,5 +8,5 @@ public interface IAsyncTaskBuilder<TIn, TOut>
 
     // IAsyncTaskBuilder<TInput, TAck, TOutput> WithErrorHandler<THandler>() where THandler : IAsyncTaskErrorHandler<TAck>;
 
-    ITask Create();
+    ITask Create(string queue = Constants.DefaultQueueName);
 }

@@ -2,5 +2,5 @@ namespace TaskMaestro.Builders;
 
 public interface ISyncTaskBuilder<TIn, TOut>
 {
-    ITask Create();
+    ITask Create(string queue = Constants.DefaultQueueName);
 }

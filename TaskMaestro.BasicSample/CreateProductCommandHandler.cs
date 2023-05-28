@@ -17,6 +17,6 @@ public class CreateProductCommandHandler : IAsyncTaskHandler<ProductInputData, P
         var productId = new Random().Next(1000, 9999);
         Console.WriteLine($"Product saved: Id={productId}, Name={input.Name}");
 
-        return Task.FromResult(new AsyncEndTaskResult<ProductCreatedAck>(new ProductCreatedAck(productId)));
+        return Task.FromResult(new AsyncEndTaskResult<ProductCreatedAck>(new ProductCreatedAck(productId, input.Name)));
     }
 }

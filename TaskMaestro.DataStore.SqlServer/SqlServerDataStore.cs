@@ -47,8 +47,8 @@ public class SqlServerDataStore : IMaestroDataStore
     {
         await using var cmd = new SqlCommand(
             @"
-INSERT maestro.Tasks (Id, [Type], [Input], InputType, AckCode, AckValueType, GroupId, HandlerType, CreatedAt)
-SELECT Id, [Type], [Input], InputType, AckCode, AckValueType, GroupId, HandlerType, CreatedAt FROM @Tasks;
+INSERT maestro.Tasks (Id, [Type], [Input], InputType, AckCode, AckValueType, GroupId, HandlerType, Queue, CreatedAt, Status, MaxRetryCount, CurrentRetryCount)
+SELECT Id, [Type], [Input], InputType, AckCode, AckValueType, GroupId, HandlerType, Queue, CreatedAt, Status, MaxRetryCount, CurrentRetryCount FROM @Tasks;
 
 INSERT maestro.TaskAcks (TaskId, Code)
 SELECT TaskId, Code FROM @TasksAcks;
@@ -109,6 +109,7 @@ SELECT TaskId, Code FROM @TasksAcks;
                 GroupId = syncTask.GroupId?.ToByteArray(),
                 AckValueType = syncTask.AckValueType.AssemblyQualifiedName,
                 HandlerType = syncTask.HandlerType.AssemblyQualifiedName,
+                Queue = syncTask.Queue,
                 CreatedAt = syncTask.CreatedAt,
             },
             AsyncBeginTask asyncBeginTask => new TaskSqlType
@@ -121,6 +122,7 @@ SELECT TaskId, Code FROM @TasksAcks;
                 GroupId = asyncBeginTask.GroupId?.ToByteArray(),
                 AckValueType = asyncBeginTask.AckValueType.AssemblyQualifiedName,
                 HandlerType = asyncBeginTask.HandlerType.AssemblyQualifiedName,
+                Queue = asyncBeginTask.Queue,
                 CreatedAt = asyncBeginTask.CreatedAt,
             },
             AsyncEndTask asyncEndTask => new TaskSqlType
@@ -133,6 +135,7 @@ SELECT TaskId, Code FROM @TasksAcks;
                 GroupId = null,
                 AckValueType = asyncEndTask.AckValueType.AssemblyQualifiedName,
                 HandlerType = asyncEndTask.HandlerType.AssemblyQualifiedName,
+                Queue = asyncEndTask.Queue,
                 CreatedAt = asyncEndTask.CreatedAt,
             },
             _ => throw new InvalidOperationException("Task type is not supported")
@@ -188,6 +191,53 @@ SELECT Code, [Value], ValueType, CreatedAt FROM @Acks;
         await cmd.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task CompleteTaskAsync(TaskExecutionReport report, CancellationToken cancellationToken)
+    {
+        await using var connection = new SqlConnection(this.connectionString);
+
+        await connection.OpenAsync(cancellationToken);
+
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            await using var command = new SqlCommand(
+                @"
+INSERT maestro.TaskExecutionReports (TaskId, [Type], Message, CreatedAt)
+VALUES(@TaskId, @Type, @Message, @CreatedAt);
+
+UPDATE maestro.Tasks
+SET
+    CompletedAt = @CreatedAt,
+    FetchedAt = IIF(CurrentRetryCount <  MaxRetryCount, NULL, FetchedAt),
+    CurrentRetryCount = IIF(CurrentRetryCount <  MaxRetryCount, CurrentRetryCount + 1, MaxRetryCount),
+    Status = CASE
+        WHEN @Type = 1 THEN 3 --Completed
+        WHEN CurrentRetryCount <  MaxRetryCount THEN 5 --Retry
+        WHEN CurrentRetryCount = MaxRetryCount THEN 4 --Error
+WHERE Id = @TaskId
+",
+                connection,
+                transaction);
+
+            command.Parameters.AddWithValue("TaskId", report.TaskId.ToByteArray());
+            command.Parameters.AddWithValue("Type", (byte)report.Type);
+            command.Parameters.AddWithValue("Message", report.Message);
+            command.Parameters.AddWithValue("CreatedAt", report.CreatedAt);
+
+            await connection.OpenAsync(cancellationToken);
+
+            await command.ExecuteNonQueryAsync(cancellationToken);
+
+            await transaction.CommitAsync(CancellationToken.None);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            throw;
+        }
+    }
+
     private AckSqlType ToAckSqlType(Ack ack)
     {
         return new AckSqlType
@@ -199,13 +249,13 @@ SELECT Code, [Value], ValueType, CreatedAt FROM @Acks;
         };
     }
 
-    public async IAsyncEnumerable<ITask> ConsumeTasksAsync(string queueName, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<ITask> ConsumeTasksAsync(string queue, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
             while (true)
             {
-                var task = await this.TryFetchTaskAsync(cancellationToken);
+                var task = await this.TryFetchTaskAsync(queue, cancellationToken);
 
                 if (task is null)
                 {
@@ -225,70 +275,64 @@ SELECT Code, [Value], ValueType, CreatedAt FROM @Acks;
         }
     }
 
-    public async Task<object> GetAckValueByTypeAsync(Guid taskId, Type type, CancellationToken cancellationToken)
+    public async IAsyncEnumerable<object> GetAckValueByTypesAsync(
+        Guid taskId,
+        IEnumerable<Type> types,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        try
-        {
-            await using var connection = new SqlConnection(this.connectionString);
+        await using var connection = new SqlConnection(this.connectionString);
 
-            await connection.OpenAsync(cancellationToken);
+        #region SQL
 
-            #region SQL
-
-            const string sql = @"
-SET NOCOUNT ON;
-SET XACT_ABORT ON;
-SET TRAN ISOLATION LEVEL READ COMMITTED;
-
-UPDATE maestro.Tasks
-SET FetchedAt = GETUTCDATE()
-OUTPUT inserted.Id, inserted.[Type], inserted.[Input], inserted.InputType, inserted.AckCode, inserted.AckValueType, inserted.GroupId, inserted.HandlerType, inserted.CreatedAt, inserted.FetchedAt, inserted.CompletedAt
-WHERE Id IN(
-	SELECT TOP(1) t.Id FROM maestro.Tasks t
-	WHERE
-		t.FetchedAt IS NULL AND
-		(
-			SELECT COUNT(*)
-			FROM maestro.TaskAcks ta
-			WHERE
-				ta.TaskId = t.Id AND
-				NOT EXISTS(
-					SELECT * FROM maestro.Acks a
-					WHERE a.Code = ta.Code)
-		) = 0
-	ORDER BY t.CreatedAt
-)
+        const string sql = @"
+SELECT a.ValueType, a.Value
+FROM @AcksTypes t
+	INNER JOIN maestro.Acks a ON a.ValueType = t.ValueType
+WHERE EXISTS(SELECT * FROM maestro.TaskAcks ta WHERE ta.Code = a.Code AND ta.TaskId = @TaskId)
 ";
 
-            #endregion
+        #endregion
 
-            var command = new SqlCommand(sql, connection);
+        var command = new SqlCommand(sql, connection);
 
-            await using var dr = await command.ExecuteReaderAsync(CancellationToken.None);
+        command.Parameters.Add(new SqlParameter("TaskId", taskId.ToByteArray()));
 
-            if (!await dr.ReadAsync(CancellationToken.None))
+        command.Parameters.Add(
+            new SqlParameter(
+                "AcksTypes",
+                types
+                    .Select(
+                        t => new AckSqlType
+                        {
+                            ValueType = t.AssemblyQualifiedName,
+                            Code = Array.Empty<byte>(),
+                            Value = Array.Empty<byte>(),
+                            CreatedAt = DateTime.MinValue,
+                        })
+                    .ToDataReader())
             {
-                return null;
+                SqlDbType = SqlDbType.Structured,
+                TypeName = "maestro.AckType",
+            });
+
+        await connection.OpenAsync(cancellationToken);
+
+        await using var dr = await command.ExecuteReaderAsync(cancellationToken);
+
+        while (await dr.ReadAsync(cancellationToken))
+        {
+            var typeName = dr.GetString(0);
+
+            var type = Type.GetType(typeName);
+
+            if (type is null)
+            {
+                throw new InvalidOperationException($"The type '{typeName}' was not found in the application context");
             }
 
-            return new TaskSqlType
-            {
-                Id = dr.GetSqlBinary(0).Value,
-                Type = dr.GetByte(1),
-                Input = dr.GetSqlBinary(2).Value,
-                InputType = dr.GetString(3),
-                AckCode = dr.GetSqlBinary(4).Value,
-                AckValueType = dr.GetString(5),
-                GroupId = dr.GetNullable<byte[]>(6),
-                HandlerType = dr.GetString(7),
-                CreatedAt = dr.GetDateTime(8),
-                FetchedAt = dr.GetNullable<DateTime?>(9),
-                CompletedAt = dr.GetNullable<DateTime?>(10),
-            };
-        }
-        catch (OperationCanceledException)
-        {
-            return null;
+            var data = dr.GetSqlBinary(1).Value;
+
+            yield return DeserializeObject(data, type)!;
         }
     }
 
@@ -304,9 +348,13 @@ WHERE Id IN(
                 task.GroupId is null ? null : new Guid(task.GroupId),
                 Array.Empty<AckCode>(), // TODO
                 Type.GetType(task.HandlerType),
+                task.Queue,
                 task.CreatedAt,
                 task.FetchedAt,
-                task.CompletedAt),
+                task.CompletedAt,
+                (TaskStatus)task.Status,
+                task.MaxRetryCount,
+                task.CurrentRetryCount),
             TaskType.AsyncBegin => new AsyncBeginTask(
                 new Guid(task.Id),
                 new AckCode(task.AckCode),
@@ -315,9 +363,13 @@ WHERE Id IN(
                 task.GroupId is null ? null : new Guid(task.GroupId),
                 Array.Empty<AckCode>(), // TODO
                 Type.GetType(task.HandlerType),
+                task.Queue,
                 task.CreatedAt,
                 task.FetchedAt,
-                task.CompletedAt),
+                task.CompletedAt,
+                (TaskStatus)task.Status,
+                task.MaxRetryCount,
+                task.CurrentRetryCount),
             TaskType.AsyncEnd => new AsyncEndTask(
                 new Guid(task.Id),
                 new AckCode(task.AckCode),
@@ -326,14 +378,18 @@ WHERE Id IN(
                 Type.GetType(task.InputType),
                 Array.Empty<AckCode>(), // TODO
                 Type.GetType(task.HandlerType),
+                task.Queue,
                 task.CreatedAt,
                 task.FetchedAt,
-                task.CompletedAt),
+                task.CompletedAt,
+                (TaskStatus)task.Status,
+                task.MaxRetryCount,
+                task.CurrentRetryCount),
             _ => throw new InvalidOperationException()
         };
     }
 
-    private async Task<TaskSqlType?> TryFetchTaskAsync(CancellationToken cancellationToken)
+    private async Task<TaskSqlType?> TryFetchTaskAsync(string queue, CancellationToken cancellationToken)
     {
         try
         {
@@ -349,11 +405,27 @@ SET XACT_ABORT ON;
 SET TRAN ISOLATION LEVEL READ COMMITTED;
 
 UPDATE maestro.Tasks
-SET FetchedAt = GETUTCDATE()
-OUTPUT inserted.Id, inserted.[Type], inserted.[Input], inserted.InputType, inserted.AckCode, inserted.AckValueType, inserted.GroupId, inserted.HandlerType, inserted.CreatedAt, inserted.FetchedAt, inserted.CompletedAt
+SET FetchedAt = GETUTCDATE(), Status = @Status
+OUTPUT 
+    inserted.Id,
+    inserted.[Type],
+    inserted.[Input],
+    inserted.InputType,
+    inserted.AckCode,
+    inserted.AckValueType,
+    inserted.GroupId,
+    inserted.HandlerType,
+    inserted.Queue,
+    inserted.CreatedAt,
+    inserted.FetchedAt,
+    inserted.CompletedAt,
+    inserted.Status,
+    inserted.MaxRetryCount,
+    inserted.CurrentRetryCount
 WHERE Id IN(
-	SELECT TOP(1) t.Id FROM maestro.Tasks t WITH (UPDLOCK, ROWLOCK)
+	SELECT TOP(1) t.Id FROM maestro.Tasks t WITH (READPAST, UPDLOCK, ROWLOCK)
 	WHERE
+		t.Queue = @Queue AND
 		t.FetchedAt IS NULL AND
 		(
 			SELECT COUNT(*)
@@ -372,6 +444,9 @@ WHERE Id IN(
 
             var command = new SqlCommand(sql, connection);
 
+            command.Parameters.AddWithValue("Status", (byte)TaskStatus.Fetched);
+            command.Parameters.AddWithValue("Queue", queue);
+
             await using var dr = await command.ExecuteReaderAsync(CancellationToken.None);
 
             if (!await dr.ReadAsync(CancellationToken.None))
@@ -389,9 +464,13 @@ WHERE Id IN(
                 AckValueType = dr.GetString(5),
                 GroupId = dr.GetNullable<byte[]>(6),
                 HandlerType = dr.GetString(7),
-                CreatedAt = dr.GetDateTime(8),
-                FetchedAt = dr.GetNullable<DateTime?>(9),
-                CompletedAt = dr.GetNullable<DateTime?>(10),
+                Queue = dr.GetString(8),
+                CreatedAt = dr.GetDateTime(9),
+                FetchedAt = dr.GetNullable<DateTime?>(10),
+                CompletedAt = dr.GetNullable<DateTime?>(11),
+                Status = dr.GetByte(12),
+                MaxRetryCount = dr.GetInt32(12),
+                CurrentRetryCount = dr.GetInt32(13),
             };
         }
         catch (OperationCanceledException)
@@ -399,4 +478,14 @@ WHERE Id IN(
             return null;
         }
     }
+}
+
+internal class ConnectionManager
+{
+    public Task ExecuteAsync(  )
+}
+
+internal interface IConnection
+{
+    
 }

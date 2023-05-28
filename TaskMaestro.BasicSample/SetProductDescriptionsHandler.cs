@@ -3,10 +3,15 @@ namespace TaskMaestro.BasicSample;
 public class SetProductDescriptionsHandler
     : ISyncTaskHandler<ProductInputData, Void>
 {
-    public Task<SyncTaskResult<Void>> HandleAsync(ProductInputData input, IHandlerContext context, CancellationToken cancellationToken)
+    public async Task<SyncTaskResult<Void>> HandleAsync(
+        ProductInputData input,
+        IHandlerContext context,
+        CancellationToken cancellationToken)
     {
-        Console.WriteLine("Descriptions saved");
+        var productCreatedAck = await context.GetAckValueByType<ProductCreatedAck>(cancellationToken);
 
-        return Task.FromResult(new SyncTaskResult<Void>(Void.Value));
+        Console.WriteLine($"Descriptions saved for product {productCreatedAck.ProductName}");
+
+        return new SyncTaskResult<Void>(Void.Value);
     }
 }
