@@ -9,18 +9,17 @@ using TaskMaestro.DataStore.SqlServer.SqlTypes;
 
 public class SqlServerDataStore : IMaestroDataStore
 {
+    private readonly Func<SqlConnection> connectionFactory;
     private static readonly RecyclableMemoryStreamManager MemoryStreamManager = new(1024, 1024, 128 * 1024);
 
-    private readonly string connectionString;
-
-    public SqlServerDataStore(string connectionString)
+    public SqlServerDataStore(Func<SqlConnection> connectionFactory)
     {
-        this.connectionString = connectionString;
+        this.connectionFactory = connectionFactory;
     }
 
     public async Task SaveTasksAsync(IReadOnlyCollection<ITask> tasks, CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(this.connectionString);
+        await using var connection = this.connectionFactory();
 
         await connection.OpenAsync(cancellationToken);
 
@@ -166,7 +165,7 @@ SELECT TaskId, Code FROM @TasksAcks;
 
     public async Task SaveAcksAsync(IEnumerable<Ack> acks, CancellationToken cancellationToken = default)
     {
-        await using var connection = new SqlConnection(this.connectionString);
+        await using var connection = this.connectionFactory();
 
         await using var cmd = new SqlCommand(
             @"
@@ -193,7 +192,7 @@ SELECT Code, [Value], ValueType, CreatedAt FROM @Acks;
 
     public async Task CompleteTaskAsync(TaskExecutionReport report, CancellationToken cancellationToken)
     {
-        await using var connection = new SqlConnection(this.connectionString);
+        await using var connection = this.connectionFactory();
 
         await connection.OpenAsync(cancellationToken);
 
@@ -211,10 +210,12 @@ SET
     CompletedAt = @CreatedAt,
     FetchedAt = IIF(CurrentRetryCount <  MaxRetryCount, NULL, FetchedAt),
     CurrentRetryCount = IIF(CurrentRetryCount <  MaxRetryCount, CurrentRetryCount + 1, MaxRetryCount),
-    Status = CASE
-        WHEN @Type = 1 THEN 3 --Completed
-        WHEN CurrentRetryCount <  MaxRetryCount THEN 5 --Retry
-        WHEN CurrentRetryCount = MaxRetryCount THEN 4 --Error
+    Status =
+        CASE
+            WHEN @Type = 1 THEN 3 --Completed
+            WHEN CurrentRetryCount <  MaxRetryCount THEN 5 --Retry
+            WHEN CurrentRetryCount = MaxRetryCount THEN 4 --Error
+        END
 WHERE Id = @TaskId
 ",
                 connection,
@@ -224,8 +225,6 @@ WHERE Id = @TaskId
             command.Parameters.AddWithValue("Type", (byte)report.Type);
             command.Parameters.AddWithValue("Message", report.Message);
             command.Parameters.AddWithValue("CreatedAt", report.CreatedAt);
-
-            await connection.OpenAsync(cancellationToken);
 
             await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -280,7 +279,7 @@ WHERE Id = @TaskId
         IEnumerable<Type> types,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await using var connection = new SqlConnection(this.connectionString);
+        await using var connection = this.connectionFactory();
 
         #region SQL
 
@@ -393,7 +392,7 @@ WHERE EXISTS(SELECT * FROM maestro.TaskAcks ta WHERE ta.Code = a.Code AND ta.Tas
     {
         try
         {
-            await using var connection = new SqlConnection(this.connectionString);
+            await using var connection = this.connectionFactory();
 
             await connection.OpenAsync(cancellationToken);
 
@@ -469,8 +468,8 @@ WHERE Id IN(
                 FetchedAt = dr.GetNullable<DateTime?>(10),
                 CompletedAt = dr.GetNullable<DateTime?>(11),
                 Status = dr.GetByte(12),
-                MaxRetryCount = dr.GetInt32(12),
-                CurrentRetryCount = dr.GetInt32(13),
+                MaxRetryCount = dr.GetInt32(13),
+                CurrentRetryCount = dr.GetInt32(14),
             };
         }
         catch (OperationCanceledException)
@@ -478,14 +477,4 @@ WHERE Id IN(
             return null;
         }
     }
-}
-
-internal class ConnectionManager
-{
-    public Task ExecuteAsync(  )
-}
-
-internal interface IConnection
-{
-    
 }

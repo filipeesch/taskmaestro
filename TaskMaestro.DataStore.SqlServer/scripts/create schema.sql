@@ -34,11 +34,13 @@ CREATE INDEX Tasks_CreatedAt ON maestro.Tasks(Queue, CreatedAt) WHERE FetchedAt 
 
 CREATE TABLE maestro.TaskExecutionReports(
 	Id INT IDENTITY(1,1) PRIMARY KEY,
-	TaskId BINARY(16) NOT NULL
+	TaskId BINARY(16) NOT NULL,
 	[Type] TINYINT NOT NULL,
 	Message VARCHAR(MAX) NULL,
 	CreatedAt DATETIME2 NOT NULL
 );
+
+CREATE INDEX TaskExecutionReports_TaskId ON maestro.TaskExecutionReports(TaskId);
 
 CREATE TYPE maestro.TaskType AS TABLE(
 	Id BINARY(16) NOT NULL PRIMARY KEY,
@@ -57,6 +59,9 @@ CREATE TYPE maestro.TaskType AS TABLE(
 	MaxRetryCount INT NOT NULL,
 	CurrentRetryCount INT NOT NULL
 );
+
+declare @myTable as maestro.TaskType
+declare @test as table( Id as int, name as varchar(12) )
 
 CREATE TABLE maestro.Acks(
 	Code BINARY(20) NOT NULL PRIMARY KEY,

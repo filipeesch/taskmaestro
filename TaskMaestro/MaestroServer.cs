@@ -3,14 +3,14 @@ namespace TaskMaestro;
 public class MaestroServer : IMaestroServer
 {
     private readonly IWorkerFactory workerFactory;
-    private readonly MaestroQueue[] queues;
+    private readonly IReadOnlyCollection<MaestroQueue> queues;
 
     private readonly List<IMaestroWorker> workers = new();
     private readonly SemaphoreSlim semaphore = new(1, 1);
 
     public MaestroServer(
         IWorkerFactory workerFactory,
-        MaestroQueue[] queues)
+        IReadOnlyCollection<MaestroQueue> queues)
     {
         this.workerFactory = workerFactory;
         this.queues = queues;
